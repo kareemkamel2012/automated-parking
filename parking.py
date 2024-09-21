@@ -7,33 +7,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 import os
 from dotenv import load_dotenv
-import time
 from fake_useragent import UserAgent
-import requests
-
-def login(email, password):
-    LOGIN_URL = "https://mpls.flowbirdapp.com/customer/login/"
-    QUERY_PARAMS = {
-        'rt': '1726802501702',
-        'version': '2.32.0 1616'
-    }
-    body = {
-        'username': email,
-        'countryCode': None,
-        'password': password,
-        'rememberMe': False
-    }
-
-    response = requests.post(LOGIN_URL, params=QUERY_PARAMS, data=body)
-    if response.status_code == 200:
-        print("Login successful")
-        return response.json()
-    else:
-        print(f"Login failed. Status code: {response.status_code}")
-        print(f"Response: {response.text}")
-        return None
-
-
 
 APP_URL = "https://mpls.flowbirdapp.com/#/Parking"
 def pay_for_parking(spot_number, email, password, card_info):
@@ -95,21 +69,9 @@ def pay_for_parking(spot_number, email, password, card_info):
         # Remove last character from password_input, then add it back
         password_input.send_keys(Keys.BACKSPACE)
         password_input.send_keys(password[-1])
-        
-        # Click Login button with enhanced handling
-        login_button = wait_for_clickable_element(driver, By.XPATH, '//button[contains(text(), "Log in")]', "login button")
-        
-        # Try multiple methods to click the login button
-        try:
-            login_button.click()
-        except ElementNotInteractableException:
-            try:
-                driver.execute_script("arguments[0].click();", login_button)
-            except:
-                ActionChains(driver).move_to_element(login_button).click().perform()
-        
-        # Ensure form submission
-        driver.execute_script("arguments[0].form.submit();", login_button)
+
+        # Log In
+        password_input.send_keys(Keys.RETURN)
 
         # Wait for login to complete
         WebDriverWait(driver, 20).until(
@@ -175,13 +137,5 @@ def click_element(driver, element):
         print(f"Element not interactable, trying JavaScript click")
         driver.execute_script("arguments[0].click();", element)
 
-def pay_for_parking_2(spot_number, email, password, card_info):
-    session_data = login(email, password)
-    if not session_data:
-        print("Cannot proceed due to login failure")
-        return
-    print("Login successful")
-    print(session_data['token'])
-
 load_dotenv()
-pay_for_parking_2(os.getenv("SPOT_NUMBER"), os.getenv("EMAIL"), os.getenv("PASSWORD"), os.getenv("CARD_INFO"))
+pay_for_parking(os.getenv("SPOT_NUMBER"), os.getenv("EMAIL"), os.getenv("PASSWORD"), os.getenv("CARD_INFO"))
