@@ -8,9 +8,38 @@ from selenium.webdriver.common.keys import Keys
 import os
 from dotenv import load_dotenv
 from fake_useragent import UserAgent
+import time
+from cardinfo import CardInfo
 
 APP_URL = "https://mpls.flowbirdapp.com/#/Parking"
-def pay_for_parking(spot_number, email, password, card_info):
+
+def pay_for_parking(spot_number: str, email: str, password: str, card_info: CardInfo):
+    
+    """
+    Create a red circle at the given coordinates on the page for 1 second.
+
+    This can be used to show where a click is happening for debugging purposes.
+
+    Args:
+        x (int): The x coordinate of the click.
+        y (int): The y coordinate of the click.
+    """
+    def show_click(x, y):
+        script = f"""
+        var marker = document.createElement('div');
+        marker.style.position = 'absolute';
+        marker.style.width = '20px';
+        marker.style.height = '20px';
+        marker.style.backgroundColor = 'red';
+        marker.style.borderRadius = '50%';
+        marker.style.left = '{x - 10}px';  // Center the circle at the click position
+        marker.style.top = '{y - 10}px';
+        marker.style.zIndex = '9999';
+        document.body.appendChild(marker);
+        """
+        driver.execute_script(script)
+
+
     driver = webdriver.Chrome()
     ua = UserAgent()
     userAgent = ua.random
@@ -95,6 +124,64 @@ def pay_for_parking(spot_number, email, password, card_info):
         start_button = wait_and_find_element(driver, By.XPATH, '//button[contains(text(), "Start parking session")]', "start parking button")
         click_element(driver, start_button)
 
+        # Click End Time link
+        end_time_link = wait_and_find_element(driver, By.CSS_SELECTOR, 'div.w-output.simulate-input.w-empty.ng-star-inserted', "End time link")
+        click_element(driver, end_time_link)
+
+        # Wait for wheel to appear
+        time.sleep(5)
+
+        # Find canvas element and click on it
+        canvas = wait_and_find_element(driver, By.CSS_SELECTOR, 'canvas', "canvas")
+        canvas_location = canvas.location
+        canvas_size = canvas.size
+
+        # Move mouse to center and almost top of canvas
+        # This selects the longest possible parking duration
+        x = canvas_location['x'] + canvas_size['width'] / 2
+        y = canvas_location['y'] + canvas_size['height'] / 10
+        ActionChains(driver).move_by_offset(x, y).click().perform()
+
+        # Find and click Confirm button
+        confirm_button = wait_and_find_element(driver, By.XPATH, '//button[contains(text(), "CONFIRM")]', "confirm button")
+        click_element(driver, confirm_button)
+
+        # Find and click Proceed to payment button
+        proceed_button = wait_and_find_element(driver, By.XPATH, '//button//span[contains(text(), "Proceed to payment")]', "proceed to payment button")
+        click_element(driver, proceed_button)
+
+        # Find and click Purchase button
+        purchase_button = wait_and_find_element(driver, By.XPATH, '//button//span[contains(text(), "Purchase")]', "purchase button")
+        click_element(driver, purchase_button)
+
+        # Switch to other tab
+        time.sleep(5)
+        handles = driver.window_handles
+        driver.switch_to.window(handles[1])
+
+        # Find and click radio element with label matching card_info['type']
+        card_type_label = wait_and_find_element(driver, By.XPATH, f'//label[contains(text(), "{card_info.type}")]', "card type label")
+        card_type_input = card_type_label.find_element(By.XPATH, '../input')
+        click_element(driver, card_type_input)
+
+        # Find and fill card number
+        card_number_input = wait_and_find_element(driver, By.XPATH, '//input[@name="card_number"]', "card number input")
+        card_number_input.send_keys(card_info.number)
+
+        # Find and fill card expiry month
+        card_expiry_month_input = wait_and_find_element(driver, By.XPATH, '//select[@name="card_expiry_month"]', "card expiry month input")
+        card_expiry_month_input.send_keys(card_info.exp_month)
+
+        # Find and fill card expiry year
+        card_expiry_year_input = wait_and_find_element(driver, By.XPATH, '//select[@name="card_expiry_year"]', "card expiry year input")
+        card_expiry_year_input.send_keys(card_info.exp_year)
+
+        # Find and fill card cvn
+        card_cvn_input = wait_and_find_element(driver, By.XPATH, '//input[@name="card_cvn"]', "card cvn input")
+        card_cvn_input.send_keys(card_info.cvn)
+
+        # Submit payment
+        card_cvn_input.send_keys(Keys.RETURN)
     except Exception as e:
         print(f"An error occurred: {str(e)}")
         driver.save_screenshot("error_screenshot.png")
@@ -137,5 +224,7 @@ def click_element(driver, element):
         print(f"Element not interactable, trying JavaScript click")
         driver.execute_script("arguments[0].click();", element)
 
-load_dotenv()
-pay_for_parking(os.getenv("SPOT_NUMBER"), os.getenv("EMAIL"), os.getenv("PASSWORD"), os.getenv("CARD_INFO"))
+load_dotenv(override=True)
+card_info = CardInfo(os.getenv("CARD_TYPE"), os.getenv("CARD_NUMBER"), os.getenv("CARD_EXPIRATION_MONTH"), os.getenv("CARD_EXPIRATION_YEAR"), os.getenv("CARD_CVN"))
+pay_for_parking(os.getenv("SPOT_NUMBER"), os.getenv("EMAIL"), os.getenv("PASSWORD"), card_info)
+
