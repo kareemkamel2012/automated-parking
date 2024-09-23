@@ -10,10 +10,12 @@ from dotenv import load_dotenv
 from fake_useragent import UserAgent
 import time
 from cardinfo import CardInfo
+from datetime import datetime
+import math
 
 APP_URL = "https://mpls.flowbirdapp.com/#/Parking"
 
-def pay_for_parking(spot_number: str, email: str, password: str, card_info: CardInfo):
+def pay_for_parking(spot_number: str, duration: int, email: str, password: str, card_info: CardInfo):
     
     """
     Create a red circle at the given coordinates on the page for 1 second.
@@ -108,6 +110,15 @@ def pay_for_parking(spot_number: str, email: str, password: str, card_info: Card
         )
         print("Login successful")
 
+        # Wait for login screen to disappear
+        WebDriverWait(driver, 20).until_not(
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'div.login-container'))
+        )
+        print("Login screen disappeared")
+
+        # Ensure page is fully loaded
+        time.sleep(5)
+
         # Find and click user title
         user_title = wait_and_find_element(driver, By.CSS_SELECTOR, 'span.user-title', "user title")
         click_element(driver, user_title)
@@ -136,11 +147,19 @@ def pay_for_parking(spot_number: str, email: str, password: str, card_info: Card
         canvas_location = canvas.location
         canvas_size = canvas.size
 
-        # Move mouse to center and almost top of canvas
-        # This selects the longest possible parking duration
+        # Move mouse to center of canvas
         x = canvas_location['x'] + canvas_size['width'] / 2
-        y = canvas_location['y'] + canvas_size['height'] / 10
+        y = canvas_location['y'] + canvas_size['height'] / 2
+        # divide duration in hours by the max duration, 8, then multiply by 360 to get the angle
+        angle = duration * 45
+        # approximate radius of wheel
+        unit = canvas_size['width'] * 0.3
+        y -= math.cos(math.radians(angle)) * unit
+        x += math.sin(math.radians(angle)) * unit
+
         ActionChains(driver).move_by_offset(x, y).click().perform()
+        show_click(x, y)
+        while input("Press enter to continue") != "": pass
 
         # Find and click Confirm button
         confirm_button = wait_and_find_element(driver, By.XPATH, '//button[contains(text(), "CONFIRM")]', "confirm button")
@@ -191,7 +210,7 @@ def pay_for_parking(spot_number: str, email: str, password: str, card_info: Card
         input("Press Enter to close the browser...")
         driver.quit()
 
-def wait_and_find_element(driver, by, value, element_name, timeout=10):
+def wait_and_find_element(driver, by, value, element_name, timeout=30):
     try:
         element = WebDriverWait(driver, timeout).until(
             EC.presence_of_element_located((by, value))
@@ -204,7 +223,7 @@ def wait_and_find_element(driver, by, value, element_name, timeout=10):
         print("Current URL:", driver.current_url)
         raise
 
-def wait_for_clickable_element(driver, by, value, element_name, timeout=10):
+def wait_for_clickable_element(driver, by, value, element_name, timeout=30):
     try:
         element = WebDriverWait(driver, timeout).until(
             EC.element_to_be_clickable((by, value))
@@ -224,7 +243,17 @@ def click_element(driver, element):
         print(f"Element not interactable, trying JavaScript click")
         driver.execute_script("arguments[0].click();", element)
 
-load_dotenv(override=True)
-card_info = CardInfo(os.getenv("CARD_TYPE"), os.getenv("CARD_NUMBER"), os.getenv("CARD_EXPIRATION_MONTH"), os.getenv("CARD_EXPIRATION_YEAR"), os.getenv("CARD_CVN"))
-pay_for_parking(os.getenv("SPOT_NUMBER"), os.getenv("EMAIL"), os.getenv("PASSWORD"), card_info)
+def calculate_duration(start_time, end_time):
+    fmt = "%I:%M %p"
+    start_time_obj = datetime.strptime(start_time, fmt)
+    end_time_obj = datetime.strptime(end_time, fmt)
+
+    duration_delta = end_time_obj - start_time_obj
+    return duration_delta.total_seconds() / 3600
+
+if __name__ == "__main__":
+    load_dotenv(override=True)
+    duration = calculate_duration(os.getenv("START_TIME"), os.getenv("END_TIME"))
+    card_info = CardInfo(os.getenv("CARD_TYPE"), os.getenv("CARD_NUMBER"), os.getenv("CARD_EXPIRATION_MONTH"), os.getenv("CARD_EXPIRATION_YEAR"), os.getenv("CARD_CVN"))
+    pay_for_parking(os.getenv("SPOT_NUMBER"), duration, os.getenv("EMAIL"), os.getenv("PASSWORD"), card_info)
 

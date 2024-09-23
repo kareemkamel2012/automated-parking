@@ -1,6 +1,6 @@
 class CardInfo:
     def __init__(self, type: str, number: str, exp_month: str, exp_year: str, cvn: str):
-        if type not in ["Visa", "MasterCard", "Amex", "Discover"]:
+        if type not in ["Visa", "Mastercard", "Amex", "Discover"]:
             raise ValueError("Invalid card type")
         if len(exp_year) != 4:
             raise ValueError("Invalid expiration year - must be 4 digits")
