@@ -158,8 +158,6 @@ def pay_for_parking(spot_number: str, duration: int, email: str, password: str, 
         x += math.sin(math.radians(angle)) * unit
 
         ActionChains(driver).move_by_offset(x, y).click().perform()
-        show_click(x, y)
-        while input("Press enter to continue") != "": pass
 
         # Find and click Confirm button
         confirm_button = wait_and_find_element(driver, By.XPATH, '//button[contains(text(), "CONFIRM")]', "confirm button")
@@ -207,7 +205,7 @@ def pay_for_parking(spot_number: str, duration: int, email: str, password: str, 
         print("Error screenshot saved as error_screenshot.png")
     finally:
         # Uncomment the next line to keep the browser open for inspection
-        input("Press Enter to close the browser...")
+        # input("Press Enter to close the browser...")
         driver.quit()
 
 def wait_and_find_element(driver, by, value, element_name, timeout=30):
